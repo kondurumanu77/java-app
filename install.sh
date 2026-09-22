@@ -107,6 +107,57 @@ aws eks update-kubeconfig --region "${AWS_REGION}" --name "${EKS_CLUSTER_NAME}" 
 kubectl get nodes || true
 
 #############################################
+# Install Prometheus + Grafana (Helm)
+#############################################
+echo "Installing Prometheus & Grafana..."
+
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+helm repo update || true
+
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+cat <<'EOF' > /tmp/monitoring-values.yaml
+grafana:
+  service:
+    type: LoadBalancer
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+prometheus:
+  service:
+    type: LoadBalancer
+  prometheusSpec:
+    replicas: 1
+    retention: 2d
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+prometheus-node-exporter:
+  enabled: false
+kube-state-metrics:
+  enabled: false
+alertmanager:
+  enabled: false
+EOF
+
+helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  -f /tmp/monitoring-values.yaml \
+  --wait \
+  --timeout 10m || true
+
+kubectl get svc -n monitoring || true
+kubectl get pods -n monitoring || true
+
+#############################################
 # Final check
 #############################################
 sudo ss -tulnp | grep 9000 || true
