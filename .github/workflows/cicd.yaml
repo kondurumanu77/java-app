@@ -1,0 +1,330 @@
+name: Java CI-CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REPOSITORY: manu
+  EKS_CLUSTER_NAME: ips-cluster
+  K8S_NAMESPACE: default
+
+jobs:
+
+  ci-cd:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ==========================================================
+      # 1. CHECKOUT SOURCE CODE
+      # ==========================================================
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+
+      # ==========================================================
+      # 2. SETUP JAVA 11
+      # ==========================================================
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+
+
+      # ==========================================================
+      # 3. VERIFY JAVA AND MAVEN
+      # ==========================================================
+
+      - name: Check Java and Maven
+        run: |
+          java -version
+          mvn -version
+
+
+      # ==========================================================
+      # 4. BUILD APPLICATION
+      # ==========================================================
+
+      - name: Maven Build
+        run: |
+          mvn clean verify
+
+
+      # ==========================================================
+      # 5. SONARQUBE CODE QUALITY SCAN
+      # ==========================================================
+
+      - name: SonarQube Scan
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=my-java-app \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+
+      # ==========================================================
+      # 6. CONFIGURE AWS
+      # ==========================================================
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+
+      # ==========================================================
+      # 7. CHECK AWS IDENTITY
+      # ==========================================================
+
+      - name: Check AWS Identity
+        run: |
+          aws sts get-caller-identity
+
+
+      # ==========================================================
+      # 8. LOGIN TO AMAZON ECR
+      # ==========================================================
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+
+      # ==========================================================
+      # 9. CHECK ECR REPOSITORY
+      # ==========================================================
+
+      - name: Verify ECR Repository
+        run: |
+          aws ecr describe-repositories \
+            --repository-names $ECR_REPOSITORY \
+            --region $AWS_REGION
+
+
+      # ==========================================================
+      # 10. BUILD DOCKER IMAGE
+      # ==========================================================
+
+      - name: Build Docker Image
+        run: |
+
+          IMAGE=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+          docker build \
+            -t $IMAGE \
+            .
+
+          docker tag \
+            $IMAGE \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+
+      # ==========================================================
+      # 11. SHOW DOCKER IMAGE
+      # ==========================================================
+
+      - name: Check Docker Image
+        run: |
+          docker images
+
+
+      # ==========================================================
+      # 12. TRIVY SECURITY SCAN
+      # ==========================================================
+
+      - name: Trivy Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: 0
+
+
+      # ==========================================================
+      # 13. PUSH IMAGE WITH GIT SHA
+      # ==========================================================
+
+      - name: Push Docker Image
+        run: |
+
+          docker push \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+
+      # ==========================================================
+      # 14. PUSH LATEST IMAGE
+      # ==========================================================
+
+      - name: Push Latest Image
+        run: |
+
+          docker push \
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+
+      # ==========================================================
+      # 15. INSTALL KUBECTL
+      # ==========================================================
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+
+      # ==========================================================
+      # 16. CONNECT TO EKS
+      # ==========================================================
+
+      - name: Update kubeconfig
+        run: |
+
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $EKS_CLUSTER_NAME
+
+
+      # ==========================================================
+      # 17. VERIFY EKS CONNECTION
+      # ==========================================================
+
+      - name: Verify EKS
+        run: |
+
+          kubectl get nodes
+
+      # ==========================================================
+      # 18. INSTALL PROMETHEUS AND GRAFANA
+      # ==========================================================
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install Monitoring Stack
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+          if ! helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+              --namespace monitoring \
+              --create-namespace \
+              --set grafana.service.type=LoadBalancer \
+              --set grafana.resources.requests.cpu=50m \
+              --set grafana.resources.requests.memory=128Mi \
+              --set grafana.resources.limits.cpu=200m \
+              --set grafana.resources.limits.memory=256Mi \
+              --set prometheus.service.type=LoadBalancer \
+              --set prometheus.prometheusSpec.replicas=1 \
+              --set prometheus.prometheusSpec.retention=2d \
+              --set prometheus.prometheusSpec.resources.requests.cpu=100m \
+              --set prometheus.prometheusSpec.resources.requests.memory=256Mi \
+              --set prometheus.prometheusSpec.resources.limits.cpu=500m \
+              --set prometheus.prometheusSpec.resources.limits.memory=512Mi \
+              --set prometheus-node-exporter.enabled=false \
+              --set kube-state-metrics.enabled=false \
+              --set alertmanager.enabled=false \
+              --wait \
+              --timeout 10m; then
+            kubectl get pods -n monitoring -o wide
+            kubectl get events -n monitoring --sort-by=.lastTimestamp | tail -40
+            exit 1
+          fi
+
+          kubectl get pods -n monitoring
+          kubectl get services -n monitoring
+
+
+      # ==========================================================
+      # 19. UPDATE IMAGE IN KUBERNETES
+      # ==========================================================
+
+      - name: Update Kubernetes Image
+        run: |
+
+          IMAGE=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+          sed -i "s|IMAGE_PLACEHOLDER|$IMAGE|g" k8s/deployment.yaml
+
+
+      # ==========================================================
+      # 20. SHOW KUBERNETES MANIFEST
+      # ==========================================================
+
+      - name: Check Kubernetes Deployment
+        run: |
+          cat k8s/deployment.yaml
+
+
+      # ==========================================================
+      # 21. DEPLOY APPLICATION
+      # ==========================================================
+
+      - name: Deploy to EKS
+        run: |
+
+          kubectl apply \
+            -f k8s/deployment.yaml
+
+          kubectl apply \
+            -f k8s/service.yaml
+
+          kubectl apply \
+            -f k8s/servicemonitor.yaml
+
+
+      # ==========================================================
+      # 22. CHECK DEPLOYMENT
+      # ==========================================================
+
+      - name: Check Kubernetes Resources
+        run: |
+
+          kubectl get deployments
+          kubectl get pods
+          kubectl get services
+
+
+      # ==========================================================
+      # 23. WAIT FOR ROLLOUT
+      # ==========================================================
+
+      - name: Verify Deployment Rollout
+        run: |
+
+          kubectl rollout status \
+            deployment/devops-app \
+            --timeout=180s
+
+
+      # ==========================================================
+      # 24. FINAL STATUS
+      # ==========================================================
+
+      - name: Final Application Status
+        run: |
+
+          echo "=========================================="
+          echo " CI/CD PIPELINE COMPLETED SUCCESSFULLY"
+          echo "=========================================="
+
+          echo "Pods:"
+          kubectl get pods
+
+          echo ""
+          echo "Services:"
+          kubectl get svc
+
+          echo ""
+          echo "Deployments:"
+          kubectl get deployments
