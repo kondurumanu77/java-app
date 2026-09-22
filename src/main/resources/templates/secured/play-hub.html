@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity5">
+
+<head th:replace="fragments/header.html :: html-head(title='Game Lobby')"></head>
+
+<body class="arena-body">
+    <nav th:replace="fragments/links :: nav.navigation-links"></nav>
+
+    <main class="arena-shell container py-4">
+        <section class="arena-hero">
+            <div>
+                <p class="arena-tag">Secured Lobby</p>
+                <h1>Pick a game and play</h1>
+                <p class="arena-sub">Welcome <span sec:authentication="name"></span>. Choose from 5 mini games and play instantly.</p>
+            </div>
+        </section>
+
+        <section class="game-grid">
+            <button class="game-card active" type="button" data-target="game-ttt">
+                <h3>Tic-Tac-Toe</h3>
+                <p>Classic 3x3 strategy duel.</p>
+            </button>
+            <button class="game-card" type="button" data-target="game-connect4">
+                <h3>Connect Four</h3>
+                <p>Drop tokens, connect 4 in a row.</p>
+            </button>
+            <button class="game-card" type="button" data-target="game-memory">
+                <h3>Memory Match</h3>
+                <p>Flip cards and match all pairs.</p>
+            </button>
+            <button class="game-card" type="button" data-target="game-rps">
+                <h3>Rock Paper Scissors</h3>
+                <p>Fast rounds vs computer.</p>
+            </button>
+            <button class="game-card" type="button" data-target="game-guess">
+                <h3>Number Guess</h3>
+                <p>Crack the hidden number.</p>
+            </button>
+        </section>
+
+        <section class="game-panel active" id="game-ttt">
+            <div class="panel-head">
+                <h2>Tic-Tac-Toe</h2>
+                <div class="panel-actions">
+                    <div class="mode-switch" data-game="ttt">
+                        <button type="button" class="mode-btn active" data-mode="pvp">2 Players</button>
+                        <button type="button" class="mode-btn" data-mode="cpu">Vs Computer</button>
+                    </div>
+                    <button id="ttt-reset" class="btn btn-sm btn-light" type="button">New Game</button>
+                </div>
+            </div>
+            <p id="ttt-status" class="panel-status">Turn: X</p>
+            <div class="ttt-board" id="ttt-board">
+                <button type="button" class="ttt-cell" data-i="0"></button>
+                <button type="button" class="ttt-cell" data-i="1"></button>
+                <button type="button" class="ttt-cell" data-i="2"></button>
+                <button type="button" class="ttt-cell" data-i="3"></button>
+                <button type="button" class="ttt-cell" data-i="4"></button>
+                <button type="button" class="ttt-cell" data-i="5"></button>
+                <button type="button" class="ttt-cell" data-i="6"></button>
+                <button type="button" class="ttt-cell" data-i="7"></button>
+                <button type="button" class="ttt-cell" data-i="8"></button>
+            </div>
+        </section>
+
+        <section class="game-panel" id="game-connect4">
+            <div class="panel-head">
+                <h2>Connect Four</h2>
+                <div class="panel-actions">
+                    <div class="mode-switch" data-game="c4">
+                        <button type="button" class="mode-btn active" data-mode="pvp">2 Players</button>
+                        <button type="button" class="mode-btn" data-mode="cpu">Vs Computer</button>
+                    </div>
+                    <button id="c4-reset" class="btn btn-sm btn-light" type="button">New Game</button>
+                </div>
+            </div>
+            <p id="c4-status" class="panel-status">Turn: Red</p>
+            <div class="c4-controls">
+                <button class="c4-drop" data-col="0" type="button">1</button>
+                <button class="c4-drop" data-col="1" type="button">2</button>
+                <button class="c4-drop" data-col="2" type="button">3</button>
+                <button class="c4-drop" data-col="3" type="button">4</button>
+                <button class="c4-drop" data-col="4" type="button">5</button>
+                <button class="c4-drop" data-col="5" type="button">6</button>
+                <button class="c4-drop" data-col="6" type="button">7</button>
+            </div>
+            <div class="c4-board" id="c4-board"></div>
+        </section>
+
+        <section class="game-panel" id="game-memory">
+            <div class="panel-head">
+                <h2>Memory Match</h2>
+                <div class="panel-actions">
+                    <div class="mode-switch" data-game="memory">
+                        <button type="button" class="mode-btn active" data-mode="pvp">2 Players</button>
+                        <button type="button" class="mode-btn" data-mode="cpu">Vs Computer</button>
+                    </div>
+                    <button id="memory-reset" class="btn btn-sm btn-light" type="button">Shuffle</button>
+                </div>
+            </div>
+            <p id="memory-status" class="panel-status">Moves: 0</p>
+            <div class="memory-grid" id="memory-grid"></div>
+        </section>
+
+        <section class="game-panel" id="game-rps">
+            <div class="panel-head">
+                <h2>Rock Paper Scissors</h2>
+                <div class="mode-switch" data-game="rps">
+                    <button type="button" class="mode-btn active" data-mode="pvp">2 Players</button>
+                    <button type="button" class="mode-btn" data-mode="cpu">Vs Computer</button>
+                </div>
+            </div>
+            <p id="rps-status" class="panel-status">Choose your move.</p>
+            <div class="rps-controls">
+                <button type="button" class="rps-btn" data-move="Rock">Rock</button>
+                <button type="button" class="rps-btn" data-move="Paper">Paper</button>
+                <button type="button" class="rps-btn" data-move="Scissors">Scissors</button>
+            </div>
+            <p class="score-line">You: <span id="rps-user">0</span> | CPU: <span id="rps-cpu">0</span></p>
+        </section>
+
+        <section class="game-panel" id="game-guess">
+            <div class="panel-head">
+                <h2>Number Guess</h2>
+                <div class="panel-actions">
+                    <div class="mode-switch" data-game="guess">
+                        <button type="button" class="mode-btn active" data-mode="pvp">2 Players</button>
+                        <button type="button" class="mode-btn" data-mode="cpu">Vs Computer</button>
+                    </div>
+                    <button id="guess-reset" class="btn btn-sm btn-light" type="button">New Number</button>
+                </div>
+            </div>
+            <p id="guess-status" class="panel-status">Guess from 1 to 100</p>
+            <div class="guess-box">
+                <input id="guess-input" type="number" min="1" max="100" placeholder="Enter number">
+                <button id="guess-submit" class="btn btn-warning" type="button">Check</button>
+            </div>
+            <p class="score-line">Attempts: <span id="guess-attempts">0</span></p>
+        </section>
+    </main>
+
+    <div class="b-example-divider border border-light"></div>
+    <div th:include="fragments/links :: div.bottom-links"></div>
+    <div th:replace="fragments/footer.html :: page-footer"></div>
+    <div id="result-modal" class="result-modal" aria-hidden="true">
+        <div class="result-card">
+            <h3 id="result-title">Result</h3>
+            <p id="result-message"></p>
+            <button id="result-close" class="btn btn-warning btn-sm" type="button">Close</button>
+        </div>
+    </div>
+    <script src="../static/js/games-hub.js" th:src="@{/js/games-hub.js}"></script>
+</body>
+
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+    xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity5" data-bs-theme="light">
+
+
+<head th:replace="fragments/header.html :: html-head(title='Vcube Game Arena')"></head>
+
+<body class="home-body">
+    <nav th:replace="fragments/links :: nav.navigation-links"></nav>
+
+    <main class="container py-4">
+        <section class="home-hero">
+            <div class="home-hero-left">
+                <p class="home-badge">Professional Arcade</p>
+                <h1>Welcome to Vcube Game Arena</h1>
+                <p class="lead mb-2">Play beautiful browser games with polished UI, dual mode support, and instant rounds.</p>
+                <div sec:authorize="!hasRole('ROLE_USER')" class="hero-actions">
+                    <a href="#" th:href="@{/login}" class="btn btn-warning">Login to Play</a>
+                    <a href="#" th:href="@{/newUser}" class="btn btn-outline-light">Create Account</a>
+                </div>
+                <div sec:authorize="hasRole('ROLE_USER') || hasRole('ROLE_MANAGER')" class="hero-actions">
+                    <a href="#" th:href="@{/secured/play}" class="btn btn-warning">Open Game Lobby</a>
+                </div>
+            </div>
+            <div class="home-hero-right">
+                <div class="hero-stat">5 Games</div>
+                <div class="hero-stat">2 Modes each</div>
+                <div class="hero-stat">Responsive UI</div>
+            </div>
+        </section>
+
+        <div id="error" class="error pt-3 text-center">
+            <div th:if="${userAddedMsg}">
+                <p th:text="${userAddedMsg}"></p>
+            </div>
+        </div>
+
+        <section class="home-games">
+            <h2 class="section-title">Featured Games</h2>
+            <div class="home-game-grid" th:unless="${boardgames.empty}">
+                <div class="home-game-card" th:each="boardgame : ${boardgames}">
+                    <h4 th:text="${boardgame.name}">Game Name</h4>
+                    <p><strong>Type:</strong> <span th:text="${boardgame.gameType}"></span></p>
+                    <p><strong>Players:</strong> <span th:text="|${boardgame.minPlayers} - ${boardgame.maxPlayers}|"></span></p>
+                    <a sec:authorize="hasRole('ROLE_USER') || hasRole('ROLE_MANAGER')" href="#" th:href="@{/secured/play}" class="btn btn-sm btn-outline-warning">Play Now</a>
+                    <a sec:authorize="!hasRole('ROLE_USER')" href="#" th:href="@{/login}" class="btn btn-sm btn-outline-light">Login to Play</a>
+                </div>
+            </div>
+            <div th:if="${boardgames.empty}">
+                <p>Currently there is no boardgame database exists.</p>
+            </div>
+        </section>
+
+        <div sec:authorize="hasRole('ROLE_USER') || hasRole('ROLE_MANAGER')" class="text-center my-3">
+            <form action="#" th:action="@{/logout}" method="post">
+                <input type="submit" value="Logout" class="btn btn-primary m-2 pb-2">
+            </form>
+        </div>
+    </main>
+    <div class="b-example-divider border border-light"></div>
+
+    <div th:include="fragments/links :: div.bottom-links"></div>
+    <div th:replace="fragments/footer.html :: page-footer"></div>
+</body>
+
+</html>

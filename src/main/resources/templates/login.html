@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/header.html :: html-head(title='Log In!')"></head>
+
+<body class="login-body">
+    <nav th:replace="fragments/links :: nav.navigation-links"></nav>
+    <main class="container py-4">
+        <div class="login-wrap">
+            <div class="login-panel">
+                <h1>Login to Game Arena</h1>
+                <p class="login-sub">Access multiplayer and vs-computer modes for every game.</p>
+
+                <div th:if="${param.error}" class="alert alert-danger py-2">
+                    Invalid User Name or Password
+                </div>
+                <div th:if="${param.logout}" class="alert alert-warning py-2">
+                    You are now logged out
+                </div>
+
+                <form action="#" th:action="@{/login}" method="post">
+                    <div class="mb-3">
+                        <label for="inputUserName" class="form-label">User name</label>
+                        <input type="text" name="username" class="form-control form-control-lg" id="inputUserName"
+                            placeholder="Enter username">
+                    </div>
+                    <div class="mb-3">
+                        <label for="inputPassword" class="form-label">Password</label>
+                        <input type="password" name="password" class="form-control form-control-lg" id="inputPassword"
+                            placeholder="Enter password">
+                    </div>
+                    <input type="submit" value="Log In" class="btn btn-warning w-100 py-2">
+                </form>
+
+                <div class="login-links mt-3">
+                    <p>New user? <a href="#" th:href="@{/newUser}">Create account</a></p>
+                    <p><a href="/" th:href="@{/}">Back to Home</a></p>
+                </div>
+            </div>
+
+            <div class="login-side">
+                <h3>Demo Credentials</h3>
+                <p><strong>User:</strong> bugs / bunny</p>
+                <p><strong>Manager:</strong> daffy / duck</p>
+                <hr>
+                <p>After login go to <strong>Game Lobby</strong> and choose any game.</p>
+            </div>
+        </div>
+    </main>
+    <div class="b-example-divider border border-light"></div>
+    <div th:include="fragments/links :: div.bottom-links"></div>
+    <div th:replace="fragments/footer.html :: page-footer"></div>
+</body>
+
+</html>
